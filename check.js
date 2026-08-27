@@ -12,6 +12,11 @@ const WATCHED_VARIANTS = [{ sku: "4548076182146", label: "Rauchblau L" }];
 
 const STATE_FILE = new URL("./state.json", import.meta.url);
 
+// GitHub disables scheduled workflows on repos with no commit activity for 60
+// days. state.json only changes on a restock, and this shirt may sit sold out
+// for months — so nudge a heartbeat commit periodically to keep the cron alive.
+const HEARTBEAT_DAYS = 14;
+
 const topic = process.env.NTFY_TOPIC;
 if (!topic) {
   console.error("NTFY_TOPIC env var is not set");
@@ -97,7 +102,14 @@ if (nowInStock.length > 0) {
   console.log(`Notified for: ${nowInStock.join(", ")}`);
 }
 
-if (JSON.stringify(current) !== JSON.stringify(previous)) {
-  await writeFile(STATE_FILE, JSON.stringify(current, null, 2) + "\n");
-  console.log("State updated");
+const { lastHeartbeat, ...previousStock } = previous;
+const stale =
+  !lastHeartbeat ||
+  Date.now() - Date.parse(lastHeartbeat) > HEARTBEAT_DAYS * 86400_000;
+
+if (JSON.stringify(current) !== JSON.stringify(previousStock) || stale) {
+  const next = { ...current };
+  next.lastHeartbeat = stale ? new Date().toISOString() : lastHeartbeat;
+  await writeFile(STATE_FILE, JSON.stringify(next, null, 2) + "\n");
+  console.log(stale ? "State updated (heartbeat)" : "State updated");
 }
