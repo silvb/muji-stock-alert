@@ -1,0 +1,8 @@
+{
+  "name": "muji-stock-alert",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check.js"
+  }
+}
